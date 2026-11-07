@@ -32,3 +32,137 @@
   .hide{display:none}
 </style>
 </head>
+<body>
+<div class="wrap">
+  <h1>حاسبة الربح الصافي</h1>
+
+  <div class="tabs">
+    <button id="t1" class="on" onclick="setMode(1)">عندي ثمن البيع</button>
+    <button id="t2" onclick="setMode(2)">بغيت نعرف ثمن البيع</button>
+  </div>
+
+  <div class="card">
+    <h2>التكاليف</h2>
+    <div class="row">
+      <div><label>ثمن الشراء / التصنيع</label><input id="buy" type="number" inputmode="decimal" value="100"></div>
+      <div><label>العملة</label>
+        <select id="cur"><option>DH</option><option>$</option><option>€</option></select></div>
+    </div>
+    <div class="row">
+      <div><label>التوصيل (للطلبية)</label><input id="ship" type="number" inputmode="decimal" value="25"></div>
+      <div><label>التغليف (للطلبية)</label><input id="pack" type="number" inputmode="decimal" value="5"></div>
+    </div>
+    <div class="row">
+      <div><label>الإشهار (للطلبية)</label><input id="ads" type="number" inputmode="decimal" value="30"></div>
+      <div><label>عمولة المنصة %</label><input id="comm" type="number" inputmode="decimal" value="0"></div>
+    </div>
+    <div class="row one">
+      <div><label>رسوم الأداء / الدفع %</label><input id="pay" type="number" inputmode="decimal" value="0"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>أدوات العمل (كتتقسم على الطلبيات)</h2>
+    <div class="row">
+      <div><label>مصاريف الأدوات فالشهر (اشتراكات، برامج، إنترنت...)</label><input id="tools" type="number" inputmode="decimal" value="300"></div>
+      <div><label>عدد الطلبيات فالشهر</label><input id="orders" type="number" inputmode="decimal" value="100"></div>
+    </div>
+    <div class="row">
+      <div><label>ثمن معدات (كاميرا، طابعة...) دفعة وحدة</label><input id="equip" type="number" inputmode="decimal" value="0"></div>
+      <div><label>كم شهر غادي تخدم بها</label><input id="months" type="number" inputmode="decimal" value="12"></div>
+    </div>
+    <div class="note">المعدات كتتوزع على عدد الأشهر، وبعدها على الطلبيات.</div>
+  </div>
+
+  <div class="card" id="m1">
+    <h2>ثمن البيع</h2>
+    <div class="row one"><div><label>بشحال كتبيع؟</label><input id="price" type="number" inputmode="decimal" value="249"></div></div>
+  </div>
+
+  <div class="card hide" id="m2">
+    <h2>الهامش المطلوب</h2>
+    <div class="row one"><div><label>شحال بغيتي تربح من ثمن البيع %</label><input id="target" type="number" inputmode="decimal" value="30"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="big"><div class="l" id="mainLabel">الربح الصافي فكل طلبية</div><div class="v" id="profit">0</div></div>
+    <table>
+      <tr><td>ثمن البيع</td><td id="rPrice"></td></tr>
+      <tr><td>الشراء + التوصيل + التغليف + الإشهار</td><td id="rDirect"></td></tr>
+      <tr><td>العمولة + رسوم الدفع</td><td id="rFees"></td></tr>
+      <tr><td>حصة أدوات العمل فكل طلبية</td><td id="rTools"></td></tr>
+      <tr><td>مجموع التكلفة</td><td id="rCost"></td></tr>
+      <tr><td>الهامش</td><td id="rMargin"></td></tr>
+      <tr><td>أقل ثمن بلا خسارة</td><td id="rBE"></td></tr>
+      <tr><td>الربح الشهري المتوقع</td><td id="rMonth"></td></tr>
+    </table>
+    <div class="note" id="warn"></div>
+  </div>
+</div>
+
+<script>
+let mode = 1;
+const $ = id => document.getElementById(id);
+const n = id => { const v = parseFloat($(id).value); return isNaN(v) ? 0 : v; };
+
+function setMode(m){
+  mode = m;
+  $('t1').classList.toggle('on', m===1);
+  $('t2').classList.toggle('on', m===2);
+  $('m1').classList.toggle('hide', m!==1);
+  $('m2').classList.toggle('hide', m!==2);
+  calc();
+}
+
+function calc(){
+  const cur = $('cur').value;
+  const f = x => (isFinite(x) ? x.toLocaleString('en-US',{maximumFractionDigits:2}) : '—') + ' ' + cur;
+
+  const direct = n('buy') + n('ship') + n('pack') + n('ads');
+  const orders = Math.max(n('orders'), 1);
+  const equipMonthly = n('months') > 0 ? n('equip') / n('months') : 0;
+  const toolsShare = (n('tools') + equipMonthly) / orders;
+  const feeRate = (n('comm') + n('pay')) / 100;
+  const fixed = direct + toolsShare;
+
+  const breakEven = feeRate < 1 ? fixed / (1 - feeRate) : NaN;
+
+  let price;
+  if (mode === 1) {
+    price = n('price');
+  } else {
+    const t = n('target') / 100;
+    const d = 1 - t - feeRate;
+    price = d > 0 ? fixed / d : NaN;
+  }
+
+  const fees = price * feeRate;
+  const cost = fixed + fees;
+  const profit = price - cost;
+  const margin = price > 0 ? profit / price * 100 : NaN;
+
+  $('mainLabel').textContent = mode === 1 ? 'الربح الصافي فكل طلبية' : 'الثمن اللي خاصك تبيع به';
+  const big = mode === 1 ? profit : price;
+  $('profit').textContent = f(big);
+  $('profit').className = 'v ' + (mode === 1 ? (profit >= 0 ? 'pos' : 'neg') : '');
+
+  $('rPrice').textContent = f(price);
+  $('rDirect').textContent = f(direct);
+  $('rFees').textContent = f(fees);
+  $('rTools').textContent = f(toolsShare);
+  $('rCost').textContent = f(cost);
+  $('rMargin').textContent = isFinite(margin) ? margin.toFixed(1) + ' %' : '—';
+  $('rBE').textContent = f(breakEven);
+  $('rMonth').textContent = f(profit * orders);
+
+  let w = '';
+  if (mode === 2 && !isFinite(price)) w = 'الهامش + العمولات كيفوتو 100%، نقص الهامش المطلوب.';
+  else if (mode === 1 && profit < 0) w = 'كتخسر فهاد الثمن. خاصك تبيع بأكثر من ' + f(breakEven) + ' على الأقل.';
+  $('warn').textContent = w;
+}
+
+document.querySelectorAll('input,select').forEach(e => e.addEventListener('input', calc));
+calc();
+</script>
+</body>
+</html>
